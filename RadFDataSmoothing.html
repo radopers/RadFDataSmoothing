@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="author" content="Roland Adorni">
+<meta name="description" content="RadF data smoothing by Roland Adorni. From changes of slope to a five-diagonal linear system, with sample weights and joint surface smoothing on rectangular grids.">
+<title>RadF Data Smoothing · Roland Adorni</title>
+<style>*{box-sizing:border-box}
+:root{--ink:#193341;--muted:#4d6269;--teal:#076a65;--rust:#955134;--border:#ccd8d6;--paper:#f9faf6;--tint:#edf5f2;--sans:"Segoe UI",system-ui,sans-serif;--serif:Georgia,"Times New Roman",serif;color-scheme:light}
+html{scroll-padding-top:20px}
+body{margin:0;background:#fff;color:var(--ink);font:17px/1.73 var(--sans)}
+a{color:var(--teal);text-underline-offset:.17em}
+:focus-visible{outline:3px solid var(--rust);outline-offset:4px}
+.skip{position:absolute;left:1rem;top:-6rem;background:#fff;z-index:2;padding:.6rem 1rem}.skip:focus{top:.5rem}
+header{border-bottom:1px solid var(--border);background:var(--paper)}
+.bar,.hero{max-width:1280px;margin:auto;padding-inline:clamp(20px,5vw,76px)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-block:.85rem;font-size:.87rem}
+.bar a{text-decoration:none}.brand{font-weight:650;color:var(--ink)}.brand span{color:var(--teal);margin:0 .45rem}
+.bar nav{display:flex;flex-wrap:wrap;gap:.4rem 1.45rem}.bar nav a{color:var(--muted)}.bar a:hover,summary:hover{text-decoration:underline}
+.opening{background:var(--paper);border-bottom:1px solid var(--border)}
+.hero{display:grid;grid-template-columns:0.85fr 1.15fr;gap:clamp(28px,4.5vw,70px);align-items:center;padding-block:clamp(36px,5.2vw,78px)}
+h1,h2{font-family:var(--serif);font-weight:400;margin:0;text-wrap:balance}
+h1{font-size:clamp(3rem,5.6vw,5.1rem);line-height:1.02;letter-spacing:-.06em}
+h1 em{color:var(--teal);font-weight:400}
+.deck{font:1.16rem/1.6 var(--sans);max-width:38ch;margin:1.3rem 0 1.5rem}
+.credit{font: .825rem/1.65 var(--sans);color:var(--muted)}.credit b{color:var(--ink);display:block;font-weight:650}.credit>div+div{margin-top:.38rem}.credit .version{margin-top:.8rem}
+figure{margin:0}.demo{border:1px solid var(--border);border-top:3px solid var(--teal);padding:clamp(15px,2.2vw,28px);background:white;box-shadow:0 5px 18px #19334105}
+.demo h2,.panels h3{font:600 1rem/1.45 var(--sans);margin:0 0 .65rem}
+.legend{display:flex;align-items:center;flex-wrap:wrap;gap:.4em 1.25em;color:var(--muted);font-size:.78rem}
+.legend>span{display:inline-flex;align-items:center;gap:.4em}.legend i{display:inline-block;width:20px}
+.legend .fit{border-top:3px solid var(--teal)}.legend .line,.legend .coarse{border-top:2px dashed var(--rust)}.legend .dots{width:7px;height:7px;background:#74878b;border-radius:50%}
+svg{display:block;width:100%;height:auto;font-family:var(--sans)}
+.control{margin:.2rem 0 .75rem;border-top:1px solid var(--border);padding-top:.7rem;display:grid;grid-template-columns:1fr auto;align-items:center;font-size:.87rem}
+[hidden]{display:none!important}output{font-variant-numeric:tabular-nums;color:var(--teal);font-weight:700}
+input[type=range]{width:100%;grid-column:1/-1;margin:.5rem 0 .25rem;accent-color:var(--teal);cursor:pointer}
+.ends{grid-column:1/-1;display:flex;justify-content:space-between;font-size:.74rem;color:var(--muted)}
+figcaption,.source{color:var(--muted);font-size:.87rem;line-height:1.6}
+article{width:min(calc(100% - 44px),840px);margin:0 auto}
+section{padding:3.45rem 0 2.8rem;border-bottom:1px solid var(--border)}section:last-child{border:0}
+.section-no{margin:0 0 .55rem;color:var(--teal);font:650 .76rem/1.5 var(--sans);text-transform:uppercase;letter-spacing:.13em}
+section h2{font-size:clamp(1.9rem,3.1vw,2.65rem);line-height:1.18;letter-spacing:-.038em;margin:0 0 1.3rem}
+h3{font:650 1.15rem/1.45 var(--sans);margin:1.7rem 0 .7rem}
+p{margin:0 0 1rem}section>p:last-child,details p:last-child{margin-bottom:0}
+.math,.formula,.blockmath,section i,.terms i,.control i{font-family:var(--serif)}
+sup,sub{font-size:.72em;line-height:0}
+.formula,.blockmath{background:#f3f6f4;text-align:center;margin:1.35rem 0;padding:1rem .75rem;color:var(--ink);font-size:1.28rem;line-height:1.8}
+.formula.accent,.objective{background:var(--tint);border-left:3px solid var(--teal)}
+.frac{display:inline-flex;flex-direction:column;text-align:center;vertical-align:middle;line-height:1.35;margin-inline:.14em}.frac span:first-child{border-bottom:1px solid currentColor;padding:0 .2em}
+.eqgap{display:inline-block;vertical-align:middle;margin:0 .9em;font: .88rem var(--sans);color:var(--muted)}.paren{font-size:1.7em;vertical-align:middle}
+.objective{padding:1.2rem clamp(15px,3vw,30px);margin:1.5rem 0}
+.objective h3{margin:0;font-size:.9rem;color:var(--teal)}.objective math{margin:1.35rem auto 1.5rem;font-size:1.46rem}
+.terms{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;border-top:1px solid var(--border);padding-top:.85rem}
+.terms p{font-size:.95rem;line-height:1.6;margin:0}.terms b{display:block;margin-bottom:.15rem}
+.aside{border-left:2px solid #b6c5c1;padding:.3rem 0 .3rem 1.1rem;font-size:.95rem;color:#425962;margin:1.4rem 0 .5rem}
+.tablebox{overflow:auto;margin:1.2rem 0}
+table{border-collapse:collapse;width:100%;font-size:.94rem;line-height:1.5}th,td{text-align:left;padding:.64rem .58rem;border-bottom:1px solid var(--border)}
+thead{background:var(--tint);color:#244c4a}thead th{font-weight:650}
+tbody th{font-weight:550}caption{text-align:left;padding:0 0 .65rem;color:var(--muted);font-size:.86rem}
+.stencil td,.stencil thead th:not(:first-child){text-align:center;font:1.06rem var(--serif);white-space:nowrap}.stencil th:first-child{min-width:8.5rem}
+.stencil th i{white-space:nowrap}.variants td,.variants th{vertical-align:top}.variants code{overflow-wrap:anywhere}
+details{margin:1.35rem 0 0;border-block:1px solid var(--border);padding:.1rem 0}summary{cursor:pointer;color:var(--teal);font-weight:650;padding:.6rem 0}details[open]{padding-bottom:.8rem}
+details p{margin-top:.4rem}code,pre{font-family:Consolas,ui-monospace,monospace}code{font-size:.88em}
+pre{margin:.75rem 0;background:#f2f5f4;color:#203f49;overflow:auto;padding:1rem;font: .84rem/1.6 Consolas,monospace;tab-size:2}pre code{font:inherit}
+.comparison{border:1px solid var(--border);padding:1.1rem;margin:1.45rem 0}.panels{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:.8rem 0}
+.panels h3{font-size:.95rem;margin:0}.panels>div{min-width:0}
+.blockmath{display:flex;justify-content:center;align-items:center;gap:.5em}
+.matrix{display:grid;grid-template-columns:repeat(3,1.8em);gap:.15em .45em;position:relative;line-height:1.35;padding:.22em .4em}
+.matrix::before,.matrix::after{content:"";position:absolute;inset-block:0;width:.25em;border-block:1.5px solid}.matrix::before{left:0;border-left:1.5px solid}.matrix::after{right:0;border-right:1.5px solid}
+.source{margin-top:2rem}footer{border-top:1px solid var(--border);text-align:center;padding:1.3rem;font-size:.8rem;color:var(--muted)}footer span{margin-inline:.45rem}
+@media(max-width:850px){.hero{grid-template-columns:1fr 1.1fr;gap:24px}.bar,.hero{padding-inline:22px}.demo{padding:15px}}
+@media(max-width:690px){.hero{grid-template-columns:1fr}.intro{max-width:510px}h1 br{display:none}h1 em::before{content:" "}.deck{max-width:unset;margin:.95rem 0}.credit b{display:inline}.credit b::after{content:" · "}.credit>div+div{margin-top:.15rem}.credit .version{margin-top:.3rem}.bar{flex-wrap:wrap;gap:.2rem .8rem}.bar nav{font-size:.78rem;gap:.4rem 1rem}.terms,.panels{grid-template-columns:1fr;gap:.75rem}.formula{font-size:1.12rem}.objective math{font-size:clamp(.87rem,3.6vw,1.24rem)}.eqgap{font-size:.8rem}.stencil{min-width:630px}.variants{min-width:410px}section{padding:2.35rem 0}article{width:calc(100% - 36px)}}
+@media print{@page{size:A4;margin:17mm}body{font-size:10.3pt;line-height:1.55}header,.skip,.control{display:none!important}.opening{background:white}.hero{padding:.5rem 0 1rem;grid-template-columns:.85fr 1.15fr;gap:1rem}.deck{font-size:10.5pt}.credit,.version,.legend,figcaption,.source{font-size:8pt}.demo{padding:.7rem}.hero h1{font-size:31pt}.hero h1 br{display:block}.hero h1 em::before{content:none}article{width:100%}section{padding:1.15rem 0}.section-no{font-size:8pt}section h2{font-size:20pt}h2,h3,summary,.section-no{break-after:avoid}figure,.objective,.formula,.aside,.tablebox,.blockmath{break-inside:avoid}.tablebox{overflow:visible}.stencil,.variants{min-width:0}.terms,.panels{grid-template-columns:1fr 1fr}th,td{padding:.35rem}details::details-content{display:block;content-visibility:visible}table,.terms p,.aside{font-size:9.5pt}pre{white-space:pre-wrap;font-size:8pt}.formula{font-size:13pt}.objective math{font-size:15pt}footer{font-size:8pt}*{print-color-adjust:exact}}
+
+.bend{display:grid;grid-template-columns:minmax(200px,.95fr) 1.15fr;align-items:center;gap:1.3rem;border-block:1px solid var(--border);margin:1.3rem 0;padding:.75rem .9rem}.bend figcaption b{display:block;color:var(--ink)}
+@media(max-width:550px){.bend{grid-template-columns:1fr;gap:.35rem}.bend svg{max-width:300px;margin:auto}}
+.seven{min-width:620px}.seven td,.seven th{text-align:center;white-space:nowrap}.seven td{font-family:var(--serif)}.seven td:last-child{border-left:1px solid var(--border)}.zero{color:#647a7b}details+details{border-top:0;margin-top:0}
+#resampling{padding:.3rem 0 1.2rem}#resampling>details{margin:0;border:0}.references{padding:1rem 0 2rem}.sf-eq{line-height:1.95}.heightkey{display:flex;align-items:center;justify-content:center;gap:.5rem;font-size:.8rem;color:var(--muted);margin:1rem 0 .5rem}.heightkey i{width:9em;height:.65rem;background:linear-gradient(to right,#30657d,#f5f5e9,#a65c3c);border:1px solid #98a7a5}.map{width:100%;height:auto;display:block;image-rendering:pixelated}.objective h3+p{margin-top:.6rem}.objective>p:last-child{margin-bottom:0}#scale .objective{margin-bottom:1rem}
+.sf-matrix{max-width:35rem;margin:1.1rem auto 1.5rem;padding:.8rem 1rem 1rem;background:var(--paper);overflow-x:auto;break-inside:avoid}
+.sf-matrix table{table-layout:fixed;border-collapse:separate;border-spacing:0}
+.sf-matrix td{text-align:center;font:1.12rem/1.4 var(--serif);padding:.18rem .05rem;border:0;white-space:nowrap}
+.sf-matrix td:first-child{border-left:2px solid var(--ink)}.sf-matrix td:last-child{border-right:2px solid var(--ink)}
+.sf-matrix tr:first-child td:first-child,.sf-matrix tr:last-child td:first-child{background:linear-gradient(var(--ink),var(--ink)) left var(--tip) / .55rem 2px no-repeat}
+.sf-matrix tr:first-child td:last-child,.sf-matrix tr:last-child td:last-child{background:linear-gradient(var(--ink),var(--ink)) right var(--tip) / .55rem 2px no-repeat}
+.sf-matrix tr:first-child{--tip:top}.sf-matrix tr:last-child{--tip:bottom}
+#surface-edge-row td:last-child{border-left:0}
+@media(max-width:420px){.sf-matrix{padding:.7rem .45rem}.sf-matrix td{font-size:1rem}}
+</style>
+</head>
+<body>
+<a class="skip" href="#idea">Skip to the paper</a>
+<header><div class="bar"><a class="brand" href="#top">Roland Adorni <span>/</span> Mathematical papers</a><nav aria-label="Paper sections"><a href="#idea">Idea</a><a href="#equations">Equations</a><a href="#settings">Parameters</a><a href="#scale">Record length</a><a href="#implementation">Implementation</a><a href="#surface">Surfaces</a></nav></div></header>
+<main id="top">
+<div class="opening"><div class="hero">
+<div class="intro"><h1>RadF<br><em>Data Smoothing</em></h1>
+<p class="deck">RadF fits a sequence of measured values. One setting controls how closely the fit follows each measurement and how easily its slope can change from one sample to the next.</p>
+<div class="credit"><div><b>Idea, formulas and original implementation</b> Roland Adorni</div><div><b>Analysis and document creation</b> ChatGPT 6.2 Astra</div><div class="version">Version 1.07 · November 2026</div></div></div>
+<figure class="demo"><h2>One data set, adjustable smoothing</h2>
+<div class="legend"><span><i class="dots"></i>Samples</span><span><i class="fit"></i>RadF fit</span><span><i class="line"></i>Regression line</span></div>
+<svg viewBox="0 0 520 230" role="img" aria-label="Synthetic measurements, their RadF fit and the least-squares line."><title>Synthetic measurements, their RadF fit and the least-squares line.</title><path d="M36,153.57142857142856H508" stroke="#dce5e2" fill="none"/><text x="28" y="157.57142857142856" text-anchor="end" font-size="12" fill="#4d6269">−1</text><path d="M36,105.0H508" stroke="#dce5e2" fill="none"/><text x="28" y="109.0" text-anchor="end" font-size="12" fill="#4d6269">0</text><path d="M36,56.428571428571416H508" stroke="#dce5e2" fill="none"/><text x="28" y="60.428571428571416" text-anchor="end" font-size="12" fill="#4d6269">1</text><text x="36" y="209" text-anchor="middle" font-size="12" fill="#4d6269">0</text><text x="272.0" y="209" text-anchor="middle" font-size="12" fill="#4d6269">20</text><text x="508" y="209" text-anchor="middle" font-size="12" fill="#4d6269">40</text><text x="272.0" y="228" text-anchor="middle" fill="#4d6269" font-size="12">Position x</text><text x="36" y="13" fill="#4d6269" font-size="12">Height</text><circle cx="36.000" cy="116.086" r="2.8" fill="#73878a"/><circle cx="47.800" cy="115.141" r="2.8" fill="#73878a"/><circle cx="59.600" cy="114.105" r="2.8" fill="#73878a"/><circle cx="71.400" cy="110.630" r="2.8" fill="#73878a"/><circle cx="83.200" cy="82.221" r="2.8" fill="#73878a"/><circle cx="95.000" cy="73.267" r="2.8" fill="#73878a"/><circle cx="106.800" cy="100.003" r="2.8" fill="#73878a"/><circle cx="118.600" cy="66.704" r="2.8" fill="#73878a"/><circle cx="130.400" cy="63.249" r="2.8" fill="#73878a"/><circle cx="142.200" cy="68.135" r="2.8" fill="#73878a"/><circle cx="154.000" cy="80.272" r="2.8" fill="#73878a"/><circle cx="165.800" cy="63.043" r="2.8" fill="#73878a"/><circle cx="177.600" cy="49.233" r="2.8" fill="#73878a"/><circle cx="189.400" cy="85.444" r="2.8" fill="#73878a"/><circle cx="201.200" cy="65.854" r="2.8" fill="#73878a"/><circle cx="213.000" cy="59.030" r="2.8" fill="#73878a"/><circle cx="224.800" cy="60.203" r="2.8" fill="#73878a"/><circle cx="236.600" cy="78.388" r="2.8" fill="#73878a"/><circle cx="248.400" cy="69.129" r="2.8" fill="#73878a"/><circle cx="260.200" cy="44.708" r="2.8" fill="#73878a"/><circle cx="272.000" cy="80.396" r="2.8" fill="#73878a"/><circle cx="283.800" cy="73.088" r="2.8" fill="#73878a"/><circle cx="295.600" cy="67.086" r="2.8" fill="#73878a"/><circle cx="307.400" cy="65.344" r="2.8" fill="#73878a"/><circle cx="319.200" cy="90.786" r="2.8" fill="#73878a"/><circle cx="331.000" cy="99.230" r="2.8" fill="#73878a"/><circle cx="342.800" cy="74.405" r="2.8" fill="#73878a"/><circle cx="354.600" cy="111.770" r="2.8" fill="#73878a"/><circle cx="366.400" cy="120.961" r="2.8" fill="#73878a"/><circle cx="378.200" cy="122.838" r="2.8" fill="#73878a"/><circle cx="390.000" cy="117.745" r="2.8" fill="#73878a"/><circle cx="401.800" cy="141.528" r="2.8" fill="#73878a"/><circle cx="413.600" cy="160.676" r="2.8" fill="#73878a"/><circle cx="425.400" cy="127.982" r="2.8" fill="#73878a"/><circle cx="437.200" cy="148.838" r="2.8" fill="#73878a"/><circle cx="449.000" cy="154.474" r="2.8" fill="#73878a"/><circle cx="460.800" cy="149.689" r="2.8" fill="#73878a"/><circle cx="472.600" cy="125.738" r="2.8" fill="#73878a"/><circle cx="484.400" cy="127.561" r="2.8" fill="#73878a"/><circle cx="496.200" cy="143.519" r="2.8" fill="#73878a"/><circle cx="508.000" cy="99.086" r="2.8" fill="#73878a"/><path d="M36.000,67.212 L47.800,68.690 L59.600,70.168 L71.400,71.645 L83.200,73.123 L95.000,74.601 L106.800,76.079 L118.600,77.557 L130.400,79.035 L142.200,80.513 L154.000,81.991 L165.800,83.469 L177.600,84.947 L189.400,86.425 L201.200,87.903 L213.000,89.381 L224.800,90.859 L236.600,92.337 L248.400,93.815 L260.200,95.292 L272.000,96.770 L283.800,98.248 L295.600,99.726 L307.400,101.204 L319.200,102.682 L331.000,104.160 L342.800,105.638 L354.600,107.116 L366.400,108.594 L378.200,110.072 L390.000,111.550 L401.800,113.028 L413.600,114.506 L425.400,115.984 L437.200,117.462 L449.000,118.939 L460.800,120.417 L472.600,121.895 L484.400,123.373 L496.200,124.851 L508.000,126.329" stroke="#955134" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 5" /><path d="M36.000,115.925 L47.800,110.162 L59.600,104.400 L71.400,98.674 L83.200,93.086 L95.000,87.819 L106.800,82.983 L118.600,78.586 L130.400,74.755 L142.200,71.533 L154.000,68.888 L165.800,66.762 L177.600,65.175 L189.400,64.122 L201.200,63.489 L213.000,63.309 L224.800,63.629 L236.600,64.468 L248.400,65.821 L260.200,67.780 L272.000,70.457 L283.800,73.808 L295.600,77.855 L307.400,82.619 L319.200,88.042 L331.000,93.953 L342.800,100.196 L354.600,106.653 L366.400,113.029 L378.200,119.064 L390.000,124.552 L401.800,129.314 L413.600,133.122 L425.400,135.835 L437.200,137.497 L449.000,138.102 L460.800,137.717 L472.600,136.525 L484.400,134.789 L496.200,132.698 L508.000,130.394" stroke="#076a65" stroke-width="3.3" fill="none" stroke-linejoin="round" stroke-linecap="round"  id="activeFit"/></svg>
+<div class="control" hidden><label for="strength">Normalized setting <i>k</i><sub>n</sub></label><output id="reading" for="strength">0.08</output><input id="strength" type="range" min="0" max="1000" step="1" value="500" aria-valuetext="0.08" aria-describedby="demoCaption"><div class="ends"><span>Follow the samples</span><span>Fit a line</span></div></div>
+<figcaption id="demoCaption">The 41 samples are one unit apart. The slider gives small settings extra travel so you can watch the first ripples fade. With stronger smoothing, the broad crest also flattens. The dashed line is the limiting fit.</figcaption></figure>
+</div></div>
+<article>
+<section id="idea"><p class="section-no">The central idea</p><h2>Balance the fit to the data against the bending of the curve</h2>
+<p>Imagine one measurement sits above its neighbors. A curve that passes through it has zero error at that point, but may bend sharply to reach it. A smoother curve can pass a little below it and accept some error. RadF chooses the fitted heights together by minimizing a weighted sum of two least-squares costs.</p>
+<div class="objective"><h3>The quantity to minimize</h3>
+<div class="formula"><i>J</i> = (1 − <i>k</i>) <i>E</i> + <i>k w B</i></div>
+<div class="terms"><p><b><i>E</i> · Squared fit errors</b>At each sample, take the difference between the fitted height and the measured height. Square these errors and add them up.</p><p><b><i>B</i> · Squared bending</b>At each interior sample, measure how much the slope of the fitted curve changes. Square these changes and add them up.</p></div></div>
+<p>Choose <i>0 &lt; k &lt; 1</i>. With <i>w</i> held fixed, <i>k</i> sets the balance. Near zero, the fit follows the measurements closely. Increasing <i>k</i> gives more weight to reducing bends and allows larger departures from the data. As <i>k</i> approaches one, the fit approaches the least-squares regression line. The positive factor <i>w</i> sets the scale of the bending term, so you can choose how much smoothing a given <i>k</i> produces.</p>
+<p><b>How do we find the heights that minimize this sum?</b> Treat each fitted height as an unknown. Take the partial derivative of the total error <i>J</i> with respect to each unknown and set each derivative equal to zero. For <i>n</i> fitted heights this gives <i>n</i> simultaneous linear equations. Solving them gives the smoothed data points. <a href="#equations">See how one derivative becomes one matrix row.</a></p>
+<h3>How RadF measures bending</h3>
+<p>RadF receives the measured heights <i>y₁, …, yₙ</i> in order, with one horizontal unit per sample. Write <i>zᵢ</i> for the fitted height at sample <i>i</i>. The original formulas called this height <i>xᵢ</i>. The horizontal position comes from the index.</p>
+<p>RadF measures bending with the discrete second derivative of the fitted heights. First subtract each height from the next. This <b>first difference</b> gives the slope over one unit interval.</p>
+<div class="formula">dᵢ = zᵢ₊₁ − zᵢ</div>
+<p>Now ask how much that slope changes. At sample <i>i</i>, the incoming slope is <i>dᵢ₋₁</i> and the outgoing slope is <i>dᵢ</i>. Subtract them in exactly the same way. This gives the <b>second difference</b>, the discrete second derivative on the unit grid.</p>
+<div class="formula">δᵢ = dᵢ − dᵢ₋₁ = (zᵢ₊₁ − zᵢ) − (zᵢ − zᵢ₋₁)<br>= zᵢ₊₁ − 2zᵢ + zᵢ₋₁</div>
+<p>A straight ramp rises by the same amount at every step, so it contributes zero to the bending sum, however steep its slope.</p>
+<figure class="bend">
+<svg viewBox="0 0 320 144" role="img" aria-label="Three equally spaced heights. The middle height lies a distance g above the straight segment joining the outer two.">
+<title>A peak measured from the line between its neighbors</title>
+<path d="M37 104L283 72" stroke="#955134" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
+<path d="M37 104L160 28L283 72" stroke="#076a65" stroke-width="3" fill="none"/>
+<path d="M160 29V88M154 88H166" stroke="#955134" fill="none" stroke-width="2"/>
+<g fill="#076a65"><circle cx="37" cy="104" r="4"/><circle cx="160" cy="28" r="4"/><circle cx="283" cy="72" r="4"/></g>
+<g fill="#193341" font-size="15" text-anchor="middle"><text x="37" y="126">zᵢ₋₁</text><text x="160" y="17">zᵢ</text><text x="283" y="96">zᵢ₊₁</text></g>
+<text x="166" y="67" fill="#955134" font-family="Georgia,serif" font-style="italic" font-size="17">g</text>
+</svg>
+<figcaption><b>Another way to see the bend.</b> Join the two outer heights with a straight segment. If the middle height sits a distance <i>g</i> above it, then <i>δᵢ = −2g</i>. The gap disappears when the points line up.</figcaption></figure>
+<p>We can now write both sums in full. Use <i>pᵢ = 1</i> when every measurement counts equally. A larger <i>pᵢ</i> gives that measurement more weight in the fit.</p>
+<div class="objective"><h3>The least-squares objective in full</h3>
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block" aria-label="J of z equals one minus k times the sum from i equals one to n of p i times z i minus y i squared, plus k w times the sum from i equals two to n minus one of delta i squared."><mrow><mi>J</mi><mo>(</mo><mi>z</mi><mo>)</mo><mo>=</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>k</mi><mo>)</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>p</mi><mi>i</mi></msub><msup><mrow><mo>(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>−</mo><msub><mi>y</mi><mi>i</mi></msub><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><mi>k</mi><mi>w</mi><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>2</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover><msubsup><mi>δ</mi><mi>i</mi><mn>2</mn></msubsup></mrow></math>
+<p>The error sum uses all <i>n</i> measured heights. The bending sum uses the <i>n − 2</i> interior heights, where a slope is available on both sides.</p></div>
+<p class="aside"><b>The two endpoints.</b> With positive sample weights, setting <i>k = 0</i> gives the data exactly. At <i>k = 1</i> the data term disappears and every straight line minimizes the remaining cost. To return the unique limiting line at that setting, compute a linear regression directly. The original routines clamp their input to [10<sup>−9</sup>, 1 − 10<sup>−9</sup>].</p>
+</section>
+<section id="equations"><p class="section-no">Finding the minimum</p><h2>Differentiate the total error once for each unknown height</h2>
+<p>Hold the measurements, the weights and <i>k</i> fixed. Imagine raising or lowering just the first fitted height <i>z₁</i>, holding all the other heights still. The partial derivative <i>∂J/∂z₁</i> tells us how the total error changes with that movement. At the minimum this derivative must be zero. The same reasoning applies to every fitted height.</p>
+<div class="formula">∂J/∂z₁ = 0, &nbsp; ∂J/∂z₂ = 0, &nbsp; …, &nbsp; ∂J/∂zₙ = 0.</div>
+<p>Both the error at a sample and the second difference across a triple are linear expressions in the unknown heights. Squaring them makes <i>J</i> quadratic, so differentiating it gives linear equations. With positive sample weights, <i>0 &lt; k &lt; 1</i> and <i>w &gt; 0</i>, the data term is strictly convex and the bending term is convex. The simultaneous solution therefore gives the unique minimum.</p>
+<h3>Follow the first height from the error sum to row 1</h3>
+<p>Write <i>aᵢ = (1 − k)pᵢ</i> and <i>b = kw</i>. Only two squares in the entire sum contain <i>z₁</i>. One measures its distance from <i>y₁</i>. The other measures the bend in the first triple.</p>
+<div class="formula">J = a₁(z₁ − y₁)² + b(z₁ − 2z₂ + z₃)²<br>+ terms independent of z₁.</div>
+<p>Differentiate with respect to <i>z₁</i>. Both squares contribute a factor of two, which we can divide out. Set the result to zero, then move the known measurement term to the right.</p>
+<div class="formula">½ ∂J/∂z₁ = a₁(z₁ − y₁) + b(z₁ − 2z₂ + z₃) = 0<br><strong>(a₁ + b)z₁ − 2bz₂ + bz₃ = a₁y₁.</strong></div>
+<p>The last line is the first row of the linear system. Its first three coefficients are <i>a₁ + b</i>, <i>−2b</i> and <i>b</i>. All later columns in that row are zero.</p>
+<h3>Repeat the differentiation for the remaining heights</h3>
+<p>A height <i>zᵢ</i> well inside the curve belongs to three bends. Its coefficient is +1 in the bend to its left, −2 in its own bend, and +1 in the bend to its right. Its derivative equation is</p>
+<div class="formula">½ ∂J/∂zᵢ = aᵢ(zᵢ − yᵢ) + b(δᵢ₋₁ − 2δᵢ + δᵢ₊₁) = 0.</div>
+<p>Expand the three second differences and the coefficients of the five neighboring heights are <strong class="math">1, −4, 6, −4, 1</strong>, each multiplied by <i>b</i>. The data term adds <i>aᵢ</i> to the middle coefficient and puts <i>aᵢyᵢ</i> on the right.</p>
+<p>At the ends there are fewer triples to differentiate. The first point belongs to just one bend, and the second point belongs to two. Counting those contributions gives the boundary rows below. Both end heights are free to move.</p>
+<div class="tablebox"><table class="stencil"><caption>Complete system from the original Maxima calculation, collected by coefficient. Indices start at 1, with <i>n ≥ 5</i>.</caption>
+<thead><tr><th scope="col">Equation</th><th scope="col">zᵢ₋₂</th><th scope="col">zᵢ₋₁</th><th scope="col">zᵢ</th><th scope="col">zᵢ₊₁</th><th scope="col">zᵢ₊₂</th><th scope="col">Right side</th></tr></thead>
+<tbody>
+<tr><th scope="row">First · <i>i = 1</i></th><td>—</td><td>—</td><td>a₁ + b</td><td>−2b</td><td>b</td><td>a₁y₁</td></tr>
+<tr><th scope="row">Second · <i>i = 2</i></th><td>—</td><td>−2b</td><td>a₂ + 5b</td><td>−4b</td><td>b</td><td>a₂y₂</td></tr>
+<tr><th scope="row">Interior · <i>3 ≤ i ≤ n − 2</i></th><td>b</td><td>−4b</td><td>aᵢ + 6b</td><td>−4b</td><td>b</td><td>aᵢyᵢ</td></tr>
+<tr><th scope="row">Next to last · <i>i = n − 1</i></th><td>b</td><td>−4b</td><td>a<sub>n−1</sub> + 5b</td><td>−2b</td><td>—</td><td>a<sub>n−1</sub>y<sub>n−1</sub></td></tr>
+<tr><th scope="row">Last · <i>i = n</i></th><td>b</td><td>−2b</td><td>a<sub>n</sub> + b</td><td>—</td><td>—</td><td>a<sub>n</sub>y<sub>n</sub></td></tr>
+</tbody></table></div>
+<h3>Solve the resulting linear system</h3>
+<p>Read across each row of the table, multiplying each coefficient by the height above it. A dash marks a position outside the grid. Collect these coefficients in the <i>n × n</i> matrix <i>A</i>, the unknown heights in the vector <i>z</i>, and the known right sides in the vector <i>r</i>, with <i>rᵢ = aᵢyᵢ</i>.</p>
+<div class="formula accent">A z = r</div>
+<p>This is the familiar <b>A x = b</b> linear system. The original notes called the unknown heights <i>x</i>. Here <i>z</i> denotes those same heights and <i>r</i> denotes the right-hand side, leaving <i>b = kw</i> for the scalar bending weight. Each row of <i>A</i> already contains the coefficients of one differentiated equation. Solve the system once by Gaussian elimination, QR factorization or, using its symmetry and narrow bands, banded Cholesky factorization. The entries of the solution are the smoothed heights in sample order.</p>
+<details><summary>The seven rows in the original symbolic calculation</summary><p>The source notes write the fitted heights as <i>x₁, …, x₇</i>. Here they are <i>z₁, …, z₇</i> so that <i>x</i> can denote horizontal position. This is the same linear system, using <i>aᵢ = (1 − k)pᵢ</i> and <i>b = kw</i>. For basic RadF, every <i>aᵢ = 1 − k</i>.</p><div class="tablebox"><table class="seven"><thead><tr><th>Row</th><th>z₁</th><th>z₂</th><th>z₃</th><th>z₄</th><th>z₅</th><th>z₆</th><th>z₇</th><th>Right side</th></tr></thead><tbody><tr><th scope="row">1</th><td>a₁ + b</td><td>−2b</td><td>b</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>a₁y₁</td></tr><tr><th scope="row">2</th><td>−2b</td><td>a₂ + 5b</td><td>−4b</td><td>b</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>a₂y₂</td></tr><tr><th scope="row">3</th><td>b</td><td>−4b</td><td>a₃ + 6b</td><td>−4b</td><td>b</td><td class="zero">0</td><td class="zero">0</td><td>a₃y₃</td></tr><tr><th scope="row">4</th><td class="zero">0</td><td>b</td><td>−4b</td><td>a₄ + 6b</td><td>−4b</td><td>b</td><td class="zero">0</td><td>a₄y₄</td></tr><tr><th scope="row">5</th><td class="zero">0</td><td class="zero">0</td><td>b</td><td>−4b</td><td>a₅ + 6b</td><td>−4b</td><td>b</td><td>a₅y₅</td></tr><tr><th scope="row">6</th><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>b</td><td>−4b</td><td>a₆ + 5b</td><td>−2b</td><td>a₆y₆</td></tr><tr><th scope="row">7</th><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>b</td><td>−2b</td><td>a₇ + b</td><td>a₇y₇</td></tr></tbody></table></div></details>
+<details><summary>The same solution in matrix notation</summary><p>Let <i>P</i> be the diagonal matrix of sample weights. Let <i>D</i> have one row per triple, with entries (1, −2, 1) in its three consecutive columns and zeros elsewhere. Then <i>Dz</i> collects the bends and the normal equations are</p>
+<div class="formula">[(1 − k)P + kw DᵀD] z = (1 − k)P y.</div><p>For any vector <i>v</i>, its quadratic cost in this matrix is <span class="math">(1 − k)Σpᵢvᵢ² + kw‖Dv‖²</span>. With nonnegative weights both terms are nonnegative. For both to vanish, <i>v</i> must be a straight line that is zero at every positively weighted position. Two distinct such positions force the entire line to be zero. This gives a unique solution and justifies a Cholesky solve.</p></details>
+</section>
+<section id="settings"><p class="section-no">The smoothing parameter</p><h2>Why did <i>k</i> need so many nines?</h2>
+<p>Divide the cost by <i>1 − k</i>. This leaves the fitted curve unchanged and reveals the multiplier that actually controls the cost of bending.</p>
+<div class="formula accent">λ = w <span class="frac"><span>k</span><span>1 − k</span></span><span class="eqgap">and hence</span>k = <span class="frac"><span>λ</span><span>w + λ</span></span></div>
+<p>In basic RadF, <i>w = 1</i>. A bend multiplier of 499 therefore requires <i>k = 0.998</i>. The normalized method moves the middle of the control to a different place. It sets <i>w = n²</i> and calls the input <i>kₙ</i>. At its midpoint, <i>kₙ = ½</i>, the multiplier is already <i>n²</i>. On the same grid the two versions give exactly the same curve whenever their multipliers agree.</p>
+<div class="formula">kₙ = <span class="frac"><span>k</span><span>k + n²(1 − k)</span></span><span class="eqgap">for the same fit as basic RadF</span></div>
+<p>The archived annual series has 156 measurements. Its raw setting of <i>k = 0.9999</i> translates to <i>kₙ ≈ 0.2912</i>, explaining the saved setting of 0.29. The archived comparison also labels the monthly fit with <i>kₙ = 0.98</i>. The annual and monthly settings already tell us that one normalized value did not serve both grids in that comparison. The reference implementation below reproduces both archived annual fits to within 8 × 10<sup>−11</sup> at every sample. The notes establish the choice <i>w = n²</i> and show the comparison. They give no derivation of the exponent. This change makes those high raw settings easier to enter, while the new control still has a nonlinear response.</p>
+<h3 id="best-kn">How “Best Kn” finds a setting for the data at hand</h3>
+<p>How much more does the fit depart from the measurements if we turn up the smoothing by one small step? Roland Adorni’s “Best Kn” routine in <cite>RadFSmoothingForm.cs</cite> tries a series of normalized settings. At each one it adds up the squared distances between the fitted heights and the measurements. It selects the setting where that total is increasing most slowly.</p>
+<p>Applying the rule to the archived error tables gives <b>0.35</b> for the annual average of 12 temperature stations, <b>0.51</b> for the historical solar series and <b>0.31</b> for the TIM solar series. Here “best” has a specific meaning. Among the settings tried, a small increase in smoothing around the selected value costs the least additional squared error. The result depends on the data and provides a starting point for further adjustment.</p>
+<details><summary>Reproduce the selection rule</summary><p>Write <i>qⱼ = j/100</i> for a trial value of <i>kₙ</i>. Fit the data at each trial setting and record <i>Eⱼ</i>, the sum of squared residuals. For each candidate, average the increase in error on the step into it and the step out of it.</p>
+<div class="formula">Eⱼ = ∑ᵢ (zᵢ(qⱼ) − yᵢ)²<br>Δⱼ = ½[(Eⱼ − Eⱼ₋₁) + (Eⱼ₊₁ − Eⱼ)] = ½(Eⱼ₊₁ − Eⱼ₋₁)</div>
+<p>The original search compares candidates from <i>j = 3</i> through <i>96</i> inclusive, so the neighboring errors needed run from <i>j = 2</i> through <i>97</i>. Select the candidate with the smallest <i>Δⱼ</i>, keeping the first in a tie. Return <i>qⱼ</i> and its fitted curve.</p></details>
+<h3>Three curve routines, two kinds of weight</h3>
+<div class="tablebox"><table class="variants"><thead><tr><th>Original routine</th><th>Global bend weight <i>w</i></th><th>Sample weights <i>pᵢ</i></th></tr></thead><tbody>
+<tr><th><code>RadFSmoothing</code></th><td>1</td><td>All 1</td></tr>
+<tr><th><code>RadFKnSmoothing</code></th><td>n²</td><td>All 1. Use <i>kₙ</i> as the input.</td></tr>
+<tr><th><code>RadFSmoothingWithWeights</code></th><td>1</td><td>For input weights <i>sᵢ</i> and <i>S = Σsᵢ</i>, use <i>pᵢ = nsᵢ/S</i> in compatible mode, or <i>pᵢ = sᵢ/S</i> in unit-sum mode.</td></tr>
+</tbody></table></div>
+<p>Use finite, nonnegative input weights with positive total and at least two positively weighted positions. Equal weights in compatible mode reproduce basic RadF. Unit-sum mode divides all the data weights by <i>n</i>, so at the same <i>k</i> the bend penalty is effectively <i>n</i> times stronger than in compatible mode. Normalizing the sum removes a common scale factor from the input weights. Dependence on the horizontal spacing is a separate question.</p>
+</section>
+<section id="scale"><p class="section-no">Record length</p><h2>What happens when you append 100 points?</h2>
+<p>Take a series at <i>x = 0, 1, …, 99</i>. Tomorrow there are 100 more measurements, continuing through <i>x = 199</i>. Every step is still one unit. A ripple that repeats every ten samples still has the same width. How do we give that ripple the same amount of smoothing?</p>
+<p><b>With basic RadF, keep the same <i>k</i>.</b> Each measurement adds one data term, and each new triple adds one bend term with exactly the same coefficients as before. The ratio <i>λ = k/(1 − k)</i> contains no sample count. Interior ripples of a given width therefore face the same local smoothing rule in both records.</p>
+<p>There is one visible change even with fixed <i>λ</i>. The old endpoint at <i>x = 99</i> used to belong to just one triple. Now two more triples reach across the join and the fit can use later observations. Since all heights are solved together, earlier values can move too. This influence is usually strongest near the join and can reach farther back under strong smoothing.</p>
+<figure class="comparison"><div class="legend"><span><i class="coarse"></i>Fit to 100 points</span><span><i class="fit"></i>Fit to 200 points</span></div>
+<div class="panels"><div><h3>Basic RadF · fixed <i>k</i></h3><svg viewBox="0 0 360 166" role="img" aria-label="The extended fit closely tracks the old fit until the join."><title>The extended fit closely tracks the old fit until the join.</title><path d="M34 112h310" stroke="#dce5e2"/><text x="25" y="116" text-anchor="end" fill="#4d6269" font-size="12">-1</text><path d="M34 77h310" stroke="#dce5e2"/><text x="25" y="81" text-anchor="end" fill="#4d6269" font-size="12">0</text><path d="M34 42h310" stroke="#dce5e2"/><text x="25" y="46" text-anchor="end" fill="#4d6269" font-size="12">1</text><text x="34.00" y="146" text-anchor="middle" fill="#4d6269" font-size="12">0</text><text x="190.57" y="146" text-anchor="middle" fill="#4d6269" font-size="12">50</text><text x="344.00" y="146" text-anchor="middle" fill="#4d6269" font-size="12">99</text><text x="188" y="163" text-anchor="middle" fill="#4d6269" font-size="12">Sample position x</text><polyline points="34.00,55.75 37.13,54.54 40.26,53.62 43.39,53.27 46.53,53.80 49.66,55.36 52.79,57.57 55.92,59.52 59.05,60.14 62.18,58.83 65.31,55.62 68.44,50.96 71.58,45.40 74.71,39.71 77.84,34.99 80.97,32.43 84.10,32.75 87.23,35.85 90.36,40.99 93.49,47.29 96.63,53.90 99.76,59.88 102.89,64.27 106.02,66.45 109.15,66.58 112.28,65.55 115.41,64.49 118.55,64.29 121.68,65.61 124.81,68.96 127.94,74.64 131.07,82.29 134.20,90.84 137.33,98.92 140.46,105.43 143.60,109.79 146.73,111.80 149.86,111.46 152.99,109.17 156.12,105.91 159.25,103.02 162.38,101.57 165.52,101.98 168.65,104.06 171.78,107.34 174.91,111.23 178.04,114.80 181.17,116.86 184.30,116.38 187.43,113.06 190.57,107.38 193.70,100.21 196.83,92.42 199.96,84.91 203.09,78.67 206.22,74.56 209.35,72.85 212.48,72.98 215.62,73.88 218.75,74.51 221.88,74.12 225.01,72.11 228.14,68.06 231.27,61.94 234.40,54.47 237.54,46.94 240.67,40.65 243.80,36.41 246.93,34.56 250.06,35.20 253.19,38.14 256.32,42.67 259.45,47.57 262.59,51.51 265.72,53.71 268.85,54.09 271.98,52.97 275.11,50.87 278.24,48.50 281.37,46.94 284.51,47.36 287.64,50.44 290.77,56.07 293.90,63.49 297.03,71.80 300.16,80.11 303.29,87.48 306.42,92.92 309.56,95.81 312.69,96.30 315.82,95.27 318.95,93.85 322.08,92.93 325.21,93.19 328.34,95.14 331.47,99.10 334.61,104.74 337.74,111.01 340.87,116.55 344.00,120.31" fill="none" stroke="#076a65" stroke-width="3" stroke-linejoin="round" /><polyline points="34.00,55.75 37.13,54.54 40.26,53.62 43.39,53.27 46.53,53.80 49.66,55.36 52.79,57.57 55.92,59.52 59.05,60.14 62.18,58.83 65.31,55.62 68.44,50.96 71.58,45.40 74.71,39.71 77.84,34.99 80.97,32.43 84.10,32.75 87.23,35.85 90.36,40.99 93.49,47.29 96.63,53.90 99.76,59.88 102.89,64.27 106.02,66.45 109.15,66.58 112.28,65.55 115.41,64.49 118.55,64.29 121.68,65.61 124.81,68.96 127.94,74.64 131.07,82.29 134.20,90.84 137.33,98.92 140.46,105.43 143.60,109.79 146.73,111.80 149.86,111.46 152.99,109.17 156.12,105.91 159.25,103.02 162.38,101.57 165.52,101.98 168.65,104.06 171.78,107.34 174.91,111.23 178.04,114.80 181.17,116.86 184.30,116.38 187.43,113.06 190.57,107.38 193.70,100.21 196.83,92.42 199.96,84.91 203.09,78.67 206.22,74.56 209.35,72.85 212.48,72.98 215.62,73.88 218.75,74.51 221.88,74.12 225.01,72.11 228.14,68.06 231.27,61.94 234.40,54.47 237.54,46.94 240.67,40.65 243.80,36.41 246.93,34.56 250.06,35.20 253.19,38.14 256.32,42.67 259.45,47.56 262.59,51.51 265.72,53.71 268.85,54.08 271.98,52.97 275.11,50.86 278.24,48.50 281.37,46.95 284.51,47.38 287.64,50.48 290.77,56.12 293.90,63.57 297.03,71.89 300.16,80.21 303.29,87.57 306.42,92.96 309.56,95.75 312.69,96.06 315.82,94.76 318.95,92.96 322.08,91.59 325.21,91.33 328.34,92.86 331.47,96.62 334.61,102.60 337.74,110.12 340.87,118.29 344.00,126.57" fill="none" stroke="#955134" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/></svg></div><div><h3>Normalized RadF · fixed <i>kₙ</i></h3><svg viewBox="0 0 360 166" role="img" aria-label="The extended fit has smaller oscillations across the original interval."><title>The extended fit has smaller oscillations across the original interval.</title><path d="M34 112h310" stroke="#dce5e2"/><text x="25" y="116" text-anchor="end" fill="#4d6269" font-size="12">-1</text><path d="M34 77h310" stroke="#dce5e2"/><text x="25" y="81" text-anchor="end" fill="#4d6269" font-size="12">0</text><path d="M34 42h310" stroke="#dce5e2"/><text x="25" y="46" text-anchor="end" fill="#4d6269" font-size="12">1</text><text x="34.00" y="146" text-anchor="middle" fill="#4d6269" font-size="12">0</text><text x="190.57" y="146" text-anchor="middle" fill="#4d6269" font-size="12">50</text><text x="344.00" y="146" text-anchor="middle" fill="#4d6269" font-size="12">99</text><text x="188" y="163" text-anchor="middle" fill="#4d6269" font-size="12">Sample position x</text><polyline points="34.00,55.95 37.13,55.62 40.26,55.36 43.39,55.22 46.53,55.26 49.66,55.46 52.79,55.66 55.92,55.55 59.05,54.83 62.18,53.34 65.31,51.14 68.44,48.44 71.58,45.53 74.71,42.79 77.84,40.66 80.97,39.59 84.10,39.85 87.23,41.41 90.36,44.04 93.49,47.39 96.63,51.11 99.76,54.79 102.89,58.08 106.02,60.74 109.15,62.83 112.28,64.60 115.41,66.43 118.55,68.65 121.68,71.50 124.81,75.16 127.94,79.65 131.07,84.81 134.20,90.23 137.33,95.40 140.46,99.87 143.60,103.39 146.73,105.82 149.86,107.17 152.99,107.61 156.12,107.48 159.25,107.24 162.38,107.27 165.52,107.72 168.65,108.56 171.78,109.62 174.91,110.63 178.04,111.25 181.17,111.05 184.30,109.69 187.43,107.07 190.57,103.35 193.70,98.87 196.83,93.99 199.96,89.10 203.09,84.60 206.22,80.80 209.35,77.81 212.48,75.48 215.62,73.46 218.75,71.38 221.88,68.97 225.01,66.02 228.14,62.40 231.27,58.17 234.40,53.61 237.54,49.20 240.67,45.44 243.80,42.65 246.93,41.01 250.06,40.56 253.19,41.22 256.32,42.71 259.45,44.58 262.59,46.38 265.72,47.81 268.85,48.79 271.98,49.43 275.11,49.91 278.24,50.53 281.37,51.66 284.51,53.70 287.64,56.85 290.77,61.08 293.90,66.09 297.03,71.53 300.16,77.00 303.29,82.11 306.42,86.47 309.56,89.86 312.69,92.30 315.82,94.07 318.95,95.54 322.08,97.04 325.21,98.83 328.34,101.09 331.47,103.88 334.61,107.04 337.74,110.19 340.87,112.85 344.00,114.60" fill="none" stroke="#076a65" stroke-width="3" stroke-linejoin="round" /><polyline points="34.00,55.75 37.13,54.54 40.26,53.62 43.39,53.27 46.53,53.80 49.66,55.36 52.79,57.57 55.92,59.52 59.05,60.14 62.18,58.83 65.31,55.62 68.44,50.96 71.58,45.40 74.71,39.71 77.84,34.99 80.97,32.43 84.10,32.75 87.23,35.85 90.36,40.99 93.49,47.29 96.63,53.90 99.76,59.88 102.89,64.27 106.02,66.45 109.15,66.58 112.28,65.55 115.41,64.49 118.55,64.29 121.68,65.61 124.81,68.96 127.94,74.64 131.07,82.29 134.20,90.84 137.33,98.92 140.46,105.43 143.60,109.79 146.73,111.80 149.86,111.46 152.99,109.17 156.12,105.91 159.25,103.02 162.38,101.57 165.52,101.98 168.65,104.06 171.78,107.34 174.91,111.23 178.04,114.80 181.17,116.86 184.30,116.38 187.43,113.06 190.57,107.38 193.70,100.21 196.83,92.42 199.96,84.91 203.09,78.67 206.22,74.56 209.35,72.85 212.48,72.98 215.62,73.88 218.75,74.51 221.88,74.12 225.01,72.11 228.14,68.06 231.27,61.94 234.40,54.47 237.54,46.94 240.67,40.65 243.80,36.41 246.93,34.56 250.06,35.20 253.19,38.14 256.32,42.67 259.45,47.56 262.59,51.51 265.72,53.71 268.85,54.08 271.98,52.97 275.11,50.86 278.24,48.50 281.37,46.95 284.51,47.38 287.64,50.48 290.77,56.12 293.90,63.57 297.03,71.89 300.16,80.21 303.29,87.57 306.42,92.96 309.56,95.75 312.69,96.06 315.82,94.76 318.95,92.96 322.08,91.59 325.21,91.33 328.34,92.86 331.47,96.62 334.61,102.60 337.74,110.12 340.87,118.29 344.00,126.57" fill="none" stroke="#955134" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/></svg></div></div>
+<figcaption>Both panels show just the original 100 positions. The dashed curve is the same in both. After appending the identical continuation, the basic fit follows its old path until close to the former endpoint. The normalized fit flattens ripples throughout the displayed interval.</figcaption></figure>
+<p><b>With normalized RadF, fixed <i>kₙ</i> has a different meaning.</b> Doubling <i>n</i> multiplies <i>w = n²</i> by four, so it multiplies <i>λ</i> by four everywhere. That is the explicit count dependence in the original normalized routine. Unit-sum sample weights can also introduce count dependence, as shown in the weights table above.</p>
+<div class="objective" id="calibration"><h3>Calibrate the weight once, then keep it</h3>
+<p>Basic RadF uses <i>w = 1</i>, but <b>any fixed positive weight</b> gives the same independence from record length. With unit spacing, equal sample weights and a fixed control setting, the bend penalty <i>λ = wk/(1 − k)</i> contains no sample count. Exposing both <i>k</i> and <i>w</i> lets one parameter control the fit and the other set its useful range.</p>
+<ol><li>On a reference series of <i>n₀</i> samples, start with <i>w₀ = n₀²</i>. Run <a href="#best-kn">Best Kn</a> once and call the selected setting <i>q</i>.</li>
+<li>Save <b><i>w = w₀ q/(1 − q)</i></b>. This is the selected fit’s bend penalty. At <i>kₑ = 0.5</i>, the factor <i>kₑ/(1 − kₑ)</i> equals one, so the new control reproduces that fit exactly in the mathematical model.</li>
+<li>For this series and later extensions at the same spacing, call <code>radF(y, ke, w)</code> with the saved weight. Move <i>kₑ</i> below or above the midpoint for less or more smoothing.</li></ol>
+<p>For the 156 annual measurements the search chose <i>q = 0.35</i>, giving <i>w = 156² × 0.35/0.65 = 13&#8239;104</i>. Keep 13&#8239;104 when the next year arrives. Run a fresh calibration only if you want the midpoint to track a newly selected fit.</p></div>
+<details><summary>Can we hold the control at 0.5 and search directly over weights?</summary>
+<p>Yes. At the midpoint <i>λ = w</i>, so one trial weight represents one trial fit. To reproduce the archived selection, take the original trial settings <i>qⱼ = j/100</i>, convert each to <i>wⱼ = w₀ qⱼ/(1 − qⱼ)</i>, and fit at <i>kₑ = 0.5</i>. Compare neighboring residual sums in the original trial order. The two searches then visit the same curves and use the same score. Equal increments in <i>w</i> would space the trials differently and could select a different midpoint.</p>
+<p>This JavaScript helper uses the <a href="#implementation">curve solver below</a>. Run it on the reference measurements and save the returned number.</p>
+<pre><code>function calibrateRadFWeight(reference) {
+  const initialWeight = reference.length ** 2;
+  const errors = [];
+  const weightAt = j =&gt; initialWeight * j / (100 - j);
+
+  for (let j = 2; j &lt;= 97; j++) {
+    const fitted = radF(reference, 0.5, weightAt(j));
+    errors[j] = fitted.reduce((sum, z, i) =&gt; sum + (z - reference[i]) ** 2, 0);
+  }
+
+  let bestIndex = 3;
+  let bestIncrease = Infinity;
+  for (let j = 3; j &lt;= 96; j++) {
+    const increase = (errors[j + 1] - errors[j - 1]) / 2;
+    if (increase &lt; bestIncrease) {
+      bestIndex = j;
+      bestIncrease = increase;
+    }
+  }
+  return weightAt(bestIndex);
+}</code></pre></details>
+<p>More generally, write <i>s</i> for the new control value <i>kₑ</i>. Choose any familiar raw setting <i>k₀</i> and the position <i>s₀</i> where you want it on the control, both strictly between zero and one. Match their bend penalties once to calculate the fixed weight.</p>
+<div class="formula">w = <span class="frac"><span>k₀</span><span>1 − k₀</span></span> · <span class="frac"><span>1 − s₀</span><span>s₀</span></span></div>
+<p>With the paper’s solver, call <code>radF(y, s, w)</code>. With the original <code>RadFSmoothing</code>, which fixes its internal weight at one, convert the control value <i>s</i> to raw <i>k</i> before the call. Both routes solve the same equations, to numerical precision and within the original routine’s clamp limits.</p>
+<div class="formula accent">k = <span class="frac"><span>ws</span><span>1 − s + ws</span></span></div>
+<p>If your favorite setting already comes from normalized RadF on a reference record of <i>n₀</i> samples, the calibration is simpler. Fix <i>w = n₀²</i> once and use the old <i>kₙ</i> directly as <i>s</i>. In either version, a longer unit-spaced record keeps the same control calibration.</p>
+<details><summary>Can equal control steps remove equal amounts of a ripple?</summary><p>Yes, if we specify the ripple whose height we want the control to measure. Choose a period <i>P ≥ 2</i> in samples. Then choose the fixed weight below. On an infinite unit grid with equal sample weights, a sinusoidal ripple of that period retains exactly the fraction <i>1 − s</i> of its amplitude. For instance, <i>s = 0.25</i> removes a quarter of its amplitude and <i>s = 0.5</i> removes half. This also describes the interior of a long record away from end effects.</p>
+<div class="formula">w = <span class="frac"><span>1</span><span>16 sin⁴(π/P)</span></span></div>
+<p>To see why, take second differences of a sine wave of period <i>P</i>. Each result is the original wave multiplied by <i>−4 sin²(π/P)</i>. In the normal equations <i>DᵀD</i> applies this factor twice, giving <i>q = 16 sin⁴(π/P)</i>. The fit therefore retains the fraction <i>1/(1 + λq)</i>. Substituting <i>w = 1/q</i> and <i>λ = ws/(1 − s)</i> gives <i>1 − s</i>. Other periods respond according to their own <i>q</i>, so “half smoothed” needs a chosen scale. This calibration follows from the equations and is an option for new implementations.</p></details>
+<details><summary>If your implementation only accepts the original normalized parameter</summary><p>First calculate <i>λ = n₀² kₙ/(1 − kₙ)</i> on the reference record. For a new length <i>n</i>, pass <i>kₙ,new = λ/(n² + λ)</i> to <code>RadFKnSmoothing</code>. The two count factors cancel, giving the intended fixed strength. The equivalent basic setting is <i>k = λ/(1 + λ)</i>.</p></details>
+<details><summary>Reproduce the 100- and 200-point comparison</summary><p>At each integer position, take <i>y(x) = sin(2πx/57) + 0.65 sin(2πx/13 + 0.3) + 0.22 cos(2πx/5)</i>. Fit the first 100 heights, then all 200, using equal sample weights. Both short fits use <i>λ = 24</i>. Keep <i>k = 24/25</i> in the left panel and <i>kₙ = 24/(100² + 24)</i> in the right. The resulting long-record multipliers are 24 and 96 respectively.</p></details>
+</section>
+
+<section id="resampling"><details><summary>A different experiment · taking more samples over the same interval</summary>
+<p>Imagine taking twice as many measurements of the same stretch of curve. Each horizontal step is now about half as long. A smooth bend then produces about one quarter of its old second difference. Squaring that difference leaves only one sixteenth of the old cost per triple. Keeping the same physical smoothing length therefore calls for about <b>sixteen times</b> the bend multiplier. The <i>n²</i> rule supplies about four times.</p>
+<figure class="comparison"><div class="legend"><span><i class="coarse"></i>33 samples</span><span><i class="fit"></i>129 samples</span></div>
+<div class="panels"><div><h3>Original <i>n²</i> rule</h3><svg viewBox="0 0 360 175" role="img" aria-label="The fine-grid normalized fit retains more of the ripples than the coarse-grid fit."><title>The fine-grid normalized fit retains more of the ripples than the coarse-grid fit.</title><path d="M36,113.4375H348" stroke="#dce5e2" fill="none"/><text x="28" y="117.4375" text-anchor="end" font-size="12" fill="#4d6269">−1</text><path d="M36,77.5H348" stroke="#dce5e2" fill="none"/><text x="28" y="81.5" text-anchor="end" font-size="12" fill="#4d6269">0</text><path d="M36,41.5625H348" stroke="#dce5e2" fill="none"/><text x="28" y="45.5625" text-anchor="end" font-size="12" fill="#4d6269">1</text><text x="36" y="154" text-anchor="middle" font-size="12" fill="#4d6269">0</text><text x="192.0" y="154" text-anchor="middle" font-size="12" fill="#4d6269">0.5</text><text x="348" y="154" text-anchor="middle" font-size="12" fill="#4d6269">1</text><text x="192.0" y="173" text-anchor="middle" fill="#4d6269" font-size="12">Position x</text><text x="36" y="13" fill="#4d6269" font-size="12">Height</text><path d="M36.000,82.368 L38.438,80.506 L40.875,78.650 L43.312,76.810 L45.750,75.000 L48.188,73.235 L50.625,71.532 L53.062,69.906 L55.500,68.373 L57.938,66.946 L60.375,65.635 L62.812,64.448 L65.250,63.389 L67.688,62.459 L70.125,61.656 L72.562,60.972 L75.000,60.399 L77.438,59.924 L79.875,59.531 L82.312,59.204 L84.750,58.923 L87.188,58.667 L89.625,58.417 L92.062,58.152 L94.500,57.851 L96.938,57.495 L99.375,57.069 L101.812,56.556 L104.250,55.946 L106.688,55.229 L109.125,54.400 L111.562,53.457 L114.000,52.402 L116.438,51.241 L118.875,49.983 L121.312,48.641 L123.750,47.231 L126.188,45.774 L128.625,44.290 L131.062,42.805 L133.500,41.345 L135.938,39.935 L138.375,38.606 L140.812,37.383 L143.250,36.294 L145.688,35.365 L148.125,34.620 L150.562,34.081 L153.000,33.767 L155.438,33.693 L157.875,33.873 L160.312,34.313 L162.750,35.018 L165.188,35.988 L167.625,37.218 L170.062,38.700 L172.500,40.421 L174.938,42.364 L177.375,44.508 L179.812,46.832 L182.250,49.308 L184.688,51.908 L187.125,54.602 L189.562,57.358 L192.000,60.146 L194.438,62.933 L196.875,65.689 L199.312,68.383 L201.750,70.990 L204.188,73.483 L206.625,75.839 L209.062,78.041 L211.500,80.072 L213.938,81.921 L216.375,83.580 L218.812,85.046 L221.250,86.319 L223.688,87.405 L226.125,88.311 L228.562,89.049 L231.000,89.636 L233.438,90.088 L235.875,90.427 L238.312,90.673 L240.750,90.852 L243.188,90.987 L245.625,91.101 L248.062,91.219 L250.500,91.364 L252.938,91.555 L255.375,91.813 L257.812,92.152 L260.250,92.587 L262.688,93.126 L265.125,93.776 L267.562,94.540 L270.000,95.415 L272.438,96.396 L274.875,97.475 L277.312,98.639 L279.750,99.871 L282.188,101.154 L284.625,102.465 L287.062,103.782 L289.500,105.080 L291.938,106.334 L294.375,107.517 L296.812,108.606 L299.250,109.574 L301.688,110.401 L304.125,111.065 L306.562,111.549 L309.000,111.839 L311.438,111.923 L313.875,111.796 L316.312,111.453 L318.750,110.898 L321.188,110.134 L323.625,109.173 L326.062,108.028 L328.500,106.715 L330.938,105.254 L333.375,103.667 L335.812,101.975 L338.250,100.204 L340.688,98.375 L343.125,96.508 L345.562,94.621 L348.000,92.727" stroke="#076a65" stroke-width="3.1" fill="none" stroke-linejoin="round" stroke-linecap="round"  /><path d="M36.000,79.362 L45.750,74.539 L55.500,69.839 L65.250,65.404 L75.000,61.321 L84.750,57.597 L94.500,54.192 L104.250,51.071 L114.000,48.268 L123.750,45.924 L133.500,44.284 L143.250,43.648 L153.000,44.293 L162.750,46.385 L172.500,49.913 L182.250,54.676 L192.000,60.307 L201.750,66.356 L211.500,72.378 L221.250,78.030 L231.000,83.112 L240.750,87.581 L250.500,91.499 L260.250,94.971 L270.000,98.063 L279.750,100.762 L289.500,102.966 L299.250,104.527 L309.000,105.315 L318.750,105.295 L328.500,104.562 L338.250,103.339 L348.000,101.902" stroke="#955134" stroke-width="2.1" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 5" /></svg></div><div><h3>Spacing-adjusted rule</h3><svg viewBox="0 0 360 175" role="img" aria-label="Fine and coarse fits almost coincide with fourth-power spacing adjustment."><title>Fine and coarse fits almost coincide with fourth-power spacing adjustment.</title><path d="M36,113.4375H348" stroke="#dce5e2" fill="none"/><text x="28" y="117.4375" text-anchor="end" font-size="12" fill="#4d6269">−1</text><path d="M36,77.5H348" stroke="#dce5e2" fill="none"/><text x="28" y="81.5" text-anchor="end" font-size="12" fill="#4d6269">0</text><path d="M36,41.5625H348" stroke="#dce5e2" fill="none"/><text x="28" y="45.5625" text-anchor="end" font-size="12" fill="#4d6269">1</text><text x="36" y="154" text-anchor="middle" font-size="12" fill="#4d6269">0</text><text x="192.0" y="154" text-anchor="middle" font-size="12" fill="#4d6269">0.5</text><text x="348" y="154" text-anchor="middle" font-size="12" fill="#4d6269">1</text><text x="192.0" y="173" text-anchor="middle" fill="#4d6269" font-size="12">Position x</text><text x="36" y="13" fill="#4d6269" font-size="12">Height</text><path d="M36.000,77.142 L38.438,76.066 L40.875,74.991 L43.312,73.917 L45.750,72.846 L48.188,71.780 L50.625,70.720 L53.062,69.668 L55.500,68.627 L57.938,67.597 L60.375,66.581 L62.812,65.580 L65.250,64.594 L67.688,63.625 L70.125,62.673 L72.562,61.738 L75.000,60.821 L77.438,59.922 L79.875,59.040 L82.312,58.174 L84.750,57.325 L87.188,56.491 L89.625,55.672 L92.062,54.868 L94.500,54.078 L96.938,53.303 L99.375,52.542 L101.812,51.797 L104.250,51.067 L106.688,50.355 L109.125,49.663 L111.562,48.991 L114.000,48.344 L116.438,47.724 L118.875,47.134 L121.312,46.578 L123.750,46.061 L126.188,45.587 L128.625,45.160 L131.062,44.785 L133.500,44.467 L135.938,44.211 L138.375,44.022 L140.812,43.903 L143.250,43.860 L145.688,43.896 L148.125,44.014 L150.562,44.218 L153.000,44.509 L155.438,44.890 L157.875,45.361 L160.312,45.923 L162.750,46.575 L165.188,47.317 L167.625,48.145 L170.062,49.057 L172.500,50.050 L174.938,51.119 L177.375,52.260 L179.812,53.467 L182.250,54.735 L184.688,56.056 L187.125,57.425 L189.562,58.834 L192.000,60.276 L194.438,61.745 L196.875,63.232 L199.312,64.731 L201.750,66.236 L204.188,67.739 L206.625,69.235 L209.062,70.719 L211.500,72.184 L213.938,73.627 L216.375,75.043 L218.812,76.429 L221.250,77.783 L223.688,79.101 L226.125,80.384 L228.562,81.629 L231.000,82.837 L233.438,84.008 L235.875,85.141 L238.312,86.239 L240.750,87.302 L243.188,88.331 L245.625,89.329 L248.062,90.297 L250.500,91.237 L252.938,92.150 L255.375,93.038 L257.812,93.903 L260.250,94.745 L262.688,95.566 L265.125,96.366 L267.562,97.144 L270.000,97.902 L272.438,98.638 L274.875,99.352 L277.312,100.043 L279.750,100.708 L282.188,101.348 L284.625,101.959 L287.062,102.540 L289.500,103.088 L291.938,103.603 L294.375,104.081 L296.812,104.522 L299.250,104.923 L301.688,105.283 L304.125,105.601 L306.562,105.877 L309.000,106.111 L311.438,106.303 L313.875,106.453 L316.312,106.564 L318.750,106.637 L321.188,106.673 L323.625,106.677 L326.062,106.651 L328.500,106.598 L330.938,106.522 L333.375,106.426 L335.812,106.316 L338.250,106.193 L340.688,106.062 L343.125,105.926 L345.562,105.786 L348.000,105.646" stroke="#076a65" stroke-width="3.1" fill="none" stroke-linejoin="round" stroke-linecap="round"  /><path d="M36.000,79.362 L45.750,74.539 L55.500,69.839 L65.250,65.404 L75.000,61.321 L84.750,57.597 L94.500,54.192 L104.250,51.071 L114.000,48.268 L123.750,45.924 L133.500,44.284 L143.250,43.648 L153.000,44.293 L162.750,46.385 L172.500,49.913 L182.250,54.676 L192.000,60.307 L201.750,66.356 L211.500,72.378 L221.250,78.030 L231.000,83.112 L240.750,87.581 L250.500,91.499 L260.250,94.971 L270.000,98.063 L279.750,100.762 L289.500,102.966 L299.250,104.527 L309.000,105.315 L318.750,105.295 L328.500,104.562 L338.250,103.339 L348.000,101.902" stroke="#955134" stroke-width="2.1" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 5" /></svg></div></div>
+<figcaption>The same smooth signal is sampled over the same interval on two grids. Both panels use the same coarse-grid fit. On the finer grid the original rule lets more ripples through. Adjusting for spacing brings the two fits close together. The small differences at the ends reflect the finite grids.</figcaption></figure>
+<h3>A rule tied to horizontal distance</h3>
+<p>Let <i>h</i> be the distance between adjacent samples. On a smooth curve, the second difference approximates <i>h²z″(x)</i>. For equal sample weights, multiplying the discrete cost by <i>h</i> turns its sums into approximations to integrals. The bend term carries an extra factor <i>h⁴</i>, so its strength in physical coordinates is <i>λh⁴</i>.</p>
+<div class="formula accent">λ<sub>new</sub> = λ<sub>ref</sub><span class="paren">(</span><span class="frac"><span>h<sub>ref</sub></span><span>h<sub>new</sub></span></span><span class="paren">)</span><sup>4</sup></div>
+<p>Choose a reference spacing <i>h<sub>ref</sub></i> where you like the behavior of the control, and keep its <i>w<sub>ref</sub></i>. At a new spacing use <i>w = w<sub>ref</sub>(h<sub>ref</sub>/h)⁴</i> with the <em>same</em> slider setting. For compatibility with an existing normalized fit, set <i>w<sub>ref</sub> = n<sub>ref</sub>²</i>. On a fixed interval including both endpoints, the spacing ratio is exactly <i>(n − 1)/(n<sub>ref</sub> − 1)</i>. This is an extension to the original routines.</p>
+<p>This adjustment preserves the physical smoothing scale approximately for well-resolved features. Finite-grid end effects and newly resolved detail can still change fitted heights.</p>
+<p class="aside"><b>Scope.</b> This derivation uses equal or mean-one comparable sample weights and a uniform grid. With equal unit-sum weights the effective multiplier is <i>nλ</i>, so apply the spacing rule to that product. With irregular horizontal positions the raw second difference measures bending in sample index. Resample to an even grid or derive the penalty using the actual spacings before interpreting the line or smoothing length in physical coordinates.</p>
+<details><summary>How the comparison curves were made</summary><p>Both grids include 0 and 1. The sampled signal is <span class="math">sin(2πx − 0.45) + 0.40 sin(6πx + 0.2) + 0.20x</span>. Use equal sample weights and <i>kₙ = 0.075</i>. The left panel uses <i>w = n²</i> on each grid. The right panel uses <i>w = 33²</i> on the coarse grid and <i>w = 33² × 4⁴</i> on the fine grid. The curves connect fitted sample heights with straight segments. At the 33 shared positions, the root-mean-square difference between the two fits falls from 0.1465 to 0.0306 with the spacing adjustment.</p></details></details>
+</section>
+<section id="implementation"><p class="section-no">Implementation</p><h2>Build the system one triple at a time</h2>
+<p>Start with the data term on the diagonal, <i>Aᵢᵢ = aᵢ</i>, and the right side <i>rᵢ = aᵢyᵢ</i>. All other entries start at zero. For each consecutive triple, add the following block to its three rows and matching three columns. Where blocks overlap, add their entries.</p>
+<div class="blockmath"><span>b ×</span><span class="matrix" role="img" aria-label="Three rows: 1, minus 2, 1; minus 2, 4, minus 2; 1, minus 2, 1"><span>1</span><span>−2</span><span>1</span><span>−2</span><span>4</span><span>−2</span><span>1</span><span>−2</span><span>1</span></span></div>
+<p>This block is the outer product of (1, −2, 1) with itself. Adding every triple once builds all five row types, including the two ends. Solve <i>Az = r</i>. Because the matrix is symmetric and has just two bands on either side of the diagonal, a banded Cholesky solver uses linear time and storage.</p>
+<p class="aside"><b>A five-sample correction.</b> All three original curve routines accept five samples. At exactly that length their assembly loop omits the coupling between the second and fourth heights. Both <i>A₂₄</i> and <i>A₄₂</i> should equal <i>b</i>. The table, the block construction and the implementation below include those entries. An easy check is to feed in any straight line. Every fitted height should reproduce its input to numerical precision.</p>
+<details><summary>Copyable JavaScript implementation</summary><p>The function returns the fitted heights in sample order. Use ordinary arrays. Call <code>radF(y, k)</code> for basic RadF or <code>radF(y, kn, y.length ** 2)</code> for the original normalized version. For a weighted fit pass <code>radF(y, k, 1, p)</code> with <i>p</i> normalized as above. Very large bend multipliers can make the system ill-conditioned in floating-point arithmetic.</p><pre><code>// y holds the measured heights. p holds optional, already normalized weights.
+function radF(y, k, w = 1, p = Array(y.length).fill(1)) {
+  const n = y.length;
+  if (n &lt; 5 || p.length !== n || !y.every(Number.isFinite) ||
+      !p.every(v =&gt; Number.isFinite(v) &amp;&amp; v &gt;= 0) ||
+      p.filter(v =&gt; v &gt; 0).length &lt; 2 ||
+      !(k &gt; 0 &amp;&amp; k &lt; 1 &amp;&amp; w &gt; 0 &amp;&amp; Number.isFinite(w))) {
+    throw new RangeError(&quot;Check the samples, weights and smoothing parameter.&quot;);
+  }
+
+  // Store the main diagonal and the two bands immediately below it.
+  const b = k * w;
+  const diag = p.map(v =&gt; (1 - k) * v);
+  const rhs = diag.map((v, i) =&gt; v * y[i]);
+  const near = Array(n).fill(0);
+  const far = Array(n).fill(0);
+  for (let i = 0; i &lt; n - 2; i++) {
+    diag[i] += b;
+    diag[i + 1] += 4 * b;
+    diag[i + 2] += b;
+    near[i + 1] -= 2 * b;
+    near[i + 2] -= 2 * b;
+    far[i + 2] += b;
+  }
+
+  // Cholesky factorization A = L Lᵀ, reusing the three bands.
+  // Solve L u = rhs in the same forward pass.
+  for (let i = 0; i &lt; n; i++) {
+    if (i &gt;= 2) far[i] /= diag[i - 2];
+    if (i &gt;= 1) near[i] = (near[i] - far[i] * near[i - 1]) / diag[i - 1];
+    const pivot = diag[i] - near[i] ** 2 - far[i] ** 2;
+    if (!(pivot &gt; 0 &amp;&amp; Number.isFinite(pivot))) {
+      throw new RangeError(&quot;No positive pivot at this precision.&quot;);
+    }
+    diag[i] = Math.sqrt(pivot);
+    if (i &gt;= 2) rhs[i] -= far[i] * rhs[i - 2];
+    if (i &gt;= 1) rhs[i] -= near[i] * rhs[i - 1];
+    rhs[i] /= diag[i];
+  }
+
+  // Solve Lᵀ z = u from the last sample to the first.
+  for (let i = n - 1; i &gt;= 0; i--) {
+    if (i + 2 &lt; n) rhs[i] -= far[i + 2] * rhs[i + 2];
+    if (i + 1 &lt; n) rhs[i] -= near[i + 1] * rhs[i + 1];
+    rhs[i] /= diag[i];
+  }
+  return rhs;
+}</code></pre></details>
+</section>
+<section id="surface"><p class="section-no">Surface smoothing</p><h2>From a curve to a grid of heights</h2>
+<p>Imagine a height measured at each crossing of a rectangular grid. Look along one row and you see an ordinary curve. Turn through a right angle and each column is another curve. <code>RadF2DSmoothing</code> chooses one height at each crossing, balancing closeness to its measurement against bending in both directions. Each crossing has a single fitted height shared by its row and column.</p>
+<figure class="comparison"><div class="panels"><div><h3>Measured heights</h3><img class="map" width="400" height="272" alt="Alternating high and low cells overlay a broad rise and hollow." src="data:image/png;base64,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"></div><div><h3>RadF surface · <i>k = 0.95</i></h3><img class="map" width="400" height="272" alt="A smooth rise at upper left and a hollow at lower right occupy the same grid." src="data:image/png;base64,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"></div></div>
+<div class="heightkey"><span>−1.5</span><i aria-hidden="true"></i><span>+1.5</span></div>
+<figcaption>Each tile is one height on the same 17 × 25 grid. Light tones mark heights near zero. Short alternating ridges fade in the fitted surface, while the broad rise and hollow remain. Both panels use the same height scale.</figcaption></figure>
+<h3>Count each horizontal and vertical bend once</h3>
+<p>Write <i>Y</i> for the measured heights and <i>Z</i> for the fitted heights. Number rows <i>r = 1, …, R</i> and columns <i>c = 1, …, C</i>. The original routine requires <i>R, C ≥ 5</i>, gives every sample equal weight, uses <i>w = 1</i>, and clamps <i>k</i> to the same open-range limits as the curve routines.</p>
+<div class="formula sf-eq"><div>H<sub>r,c</sub> = Z<sub>r,c−1</sub> − 2Z<sub>r,c</sub> + Z<sub>r,c+1</sub></div><div>V<sub>r,c</sub> = Z<sub>r−1,c</sub> − 2Z<sub>r,c</sub> + Z<sub>r+1,c</sub></div></div>
+<p>The horizontal bend <i>H</i> exists wherever there is a neighbor on either side in the row. The vertical bend <i>V</i> needs neighbors above and below. Square these bends and add them to the squared errors at all the crossings. With <i>a = 1 − k</i> and <i>b = kw</i>, minimize</p>
+<div class="formula accent sf-eq">J(Z) = a ∑<sub>all cells</sub> (Z<sub>r,c</sub> − Y<sub>r,c</sub>)² + b ∑<sub>horizontal triples</sub> H<sub>r,c</sub>² + b ∑<sub>vertical triples</sub> V<sub>r,c</sub>².</div>
+<h3>Differentiate with respect to each grid height</h3>
+<p>Apply the same minimum condition to the whole surface. Hold every other fitted height fixed and set <i>∂J/∂Z<sub>r,c</sub> = 0</i> at each crossing. On an <i>R × C</i> grid this yields <i>RC</i> simultaneous linear equations for <i>RC</i> unknown heights. The derivative at each crossing supplies one row of the surface matrix <i>A</i>.</p>
+<p>Deep inside the grid, the one-dimensional bend coefficients contribute <i>6b</i> to the central height from its row and another <i>6b</i> from its column. Each of the four immediate neighbors contributes <i>−4b</i> and each of the four neighbors two steps away along the axes contributes <i>+b</i>. Let <i>S₁</i> and <i>S₂</i> denote the sums of those heights at one and two steps, respectively. The collected Maxima equation is</p>
+<div class="formula">(a + 12b) Z<sub>r,c</sub> − 4b S₁ + b S₂ = a Y<sub>r,c</sub>.</div>
+<p>At an edge or corner, read the corresponding one-dimensional row from the <a href="#equations">coefficient table</a> for each axis. Add only the bend contributions from the two directions. Include the data term <i>a</i> on the diagonal just once. For instance, the top-left corner equation is</p>
+<div class="formula sf-eq">(a + 2b) Z₁₁ − 2b (Z₁₂ + Z₂₁) + b (Z₁₃ + Z₃₁) = a Y₁₁.</div>
+<h3 id="surface-matrix">The full matrix A for the 7 × 7 grid</h3>
+<p>The original symbolic calculation uses 49 measured heights. Read them across each grid row in turn, so the unknown vector begins <i>z = (Z₁₁, Z₁₂, …, Z₁₇, Z₂₁, …, Z₇₇)ᵀ</i>. Stack the measurements in the same order to make <i>y</i>. The system to solve is <b><i>Az = a y</i></b>, with <i>a = 1 − k</i> and <i>b = kw</i>.</p>
+<p>Group the 49 columns into seven groups of seven. Each entry in the display below is a 7 × 7 block. Read the first block row as the seven equations for the top row of the surface. The second block row gives the seven equations for the next row, and so on.</p>
+<div class="sf-matrix" tabindex="0" role="region" aria-label="A in blocks for seven rows of seven heights"><table id="surface-block-a"><caption>A in blocks for seven rows of seven heights</caption><tbody>
+<tr><td>H<sub>1</sub></td><td>−2T</td><td>T</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td></tr>
+<tr><td>−2T</td><td>H<sub>5</sub></td><td>−4T</td><td>T</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td></tr>
+<tr><td>T</td><td>−4T</td><td>H<sub>6</sub></td><td>−4T</td><td>T</td><td class="zero">0</td><td class="zero">0</td></tr>
+<tr><td class="zero">0</td><td>T</td><td>−4T</td><td>H<sub>6</sub></td><td>−4T</td><td>T</td><td class="zero">0</td></tr>
+<tr><td class="zero">0</td><td class="zero">0</td><td>T</td><td>−4T</td><td>H<sub>6</sub></td><td>−4T</td><td>T</td></tr>
+<tr><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>T</td><td>−4T</td><td>H<sub>5</sub></td><td>−2T</td></tr>
+<tr><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>T</td><td>−2T</td><td>H<sub>1</sub></td></tr>
+</tbody></table></div>
+<p>Here <i>I</i> is the 7 × 7 identity matrix, <i>T = bI</i>, and <i>0</i> is a block of zeros. A block such as <i>−2T</i> connects each height to the height in the same column of another grid row. The diagonal blocks also connect heights <em>within</em> a row. Each is built from the following matrix <i>B</i>.</p>
+<div class="sf-matrix" tabindex="0" role="region" aria-label="B · one-axis bending coefficients for seven heights"><table id="surface-b7"><caption>B · one-axis bending coefficients for seven heights</caption><tbody>
+<tr><td>1</td><td>−2</td><td>1</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td></tr>
+<tr><td>−2</td><td>5</td><td>−4</td><td>1</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td></tr>
+<tr><td>1</td><td>−4</td><td>6</td><td>−4</td><td>1</td><td class="zero">0</td><td class="zero">0</td></tr>
+<tr><td class="zero">0</td><td>1</td><td>−4</td><td>6</td><td>−4</td><td>1</td><td class="zero">0</td></tr>
+<tr><td class="zero">0</td><td class="zero">0</td><td>1</td><td>−4</td><td>6</td><td>−4</td><td>1</td></tr>
+<tr><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>1</td><td>−4</td><td>5</td><td>−2</td></tr>
+<tr><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td class="zero">0</td><td>1</td><td>−2</td><td>1</td></tr>
+</tbody></table></div>
+<div class="formula">H<sub>d</sub> = bB + (a + db)I, <span class="math">d ∈ {1, 5, 6}.</span></div>
+<p>To build <i>H₁</i>, multiply every entry of <i>B</i> by <i>b</i> and add <i>a + b</i> to each diagonal entry. For <i>H₅</i> add <i>a + 5b</i>, and for <i>H₆</i> add <i>a + 6b</i>. The <i>bB</i> part comes from bending along a grid row. The <i>db</i> on its diagonal comes from bending along a column.</p>
+<h3>Read one edge equation straight from A</h3>
+<p>Take the fourth height in the top row, <i>Z₁₄</i>. Its equation is row 4 of <i>A</i>. In the first block row, <i>H₁</i> supplies five coefficients along the top edge. The blocks <i>−2T</i> and <i>T</i> supply one coefficient each for the two heights beneath it. All other entries of row 4 are zero.</p>
+<div class="tablebox"><table class="seven" id="surface-edge-row"><caption>Nonzero entries of row 4, with columns numbered from 1. The right side is <i>aY₁₄</i>.</caption>
+<thead><tr><th scope="col">Column of A</th><th scope="col">2</th><th scope="col">3</th><th scope="col">4</th><th scope="col">5</th><th scope="col">6</th><th scope="col">11</th><th scope="col">18</th></tr></thead>
+<tbody><tr><th scope="row">Height</th><td>Z₁₂</td><td>Z₁₃</td><td>Z₁₄</td><td>Z₁₅</td><td>Z₁₆</td><td>Z₂₄</td><td>Z₃₄</td></tr><tr><th scope="row">Coefficient</th><td>b</td><td>−4b</td><td>a + 7b</td><td>−4b</td><td>b</td><td>−2b</td><td>b</td></tr></tbody></table></div>
+<p><b>For an arbitrary R × C grid,</b> start with <i>a</i> on each diagonal of the <i>RC × RC</i> matrix, then add the <a href="#implementation">three-by-three block</a> once per horizontal triple and once per vertical triple. With zero-based array indices, cell <i>(r,c)</i> has index <i>rC + c</i>. Horizontal triples use stride 1 within a row and vertical triples use stride <i>C</i>. This constructs the same blocks at any supported grid size.</p>
+<h3>What survives the strongest smoothing?</h3>
+<p>A surface has zero bend cost when every row and every column is straight. Row slopes can still change linearly from one row to the next. For example, <i>Z<sub>r,c</sub> = rc</i> is straight in each direction and forms a saddle when viewed diagonally. The original objective measures only the two axis directions, so this saddle survives at every setting.</p>
+<div class="formula">Z<sub>r,c</sub> = α + βr + γc + ηrc</div>
+<p>These are all the zero-bend surfaces. As <i>k → 1</i>, the solution approaches the least-squares fit of these four coefficients to the data. Exactly at one, every such surface gives zero cost. As with the basic curve routine, extending a unit-spaced grid at fixed <i>k</i> keeps the local bend penalty constant. New observations can change the fit near the old borders.</p>
+<details><summary>Copyable Python implementation of the joint surface solve</summary>
+<p>For an axis of length <i>m</i>, let <i>Dₘ</i> take consecutive second differences and set <i>Bₘ = DₘᵀDₘ</i>. The full equations, divided by <i>a</i>, can be written with the heights in their original rectangular layout.</p>
+<div class="formula">Z + λ(B<sub>R</sub>Z + ZB<sub>C</sub>) = Y, <span class="math">λ = b/a.</span></div>
+<p>The NumPy function below diagonalizes each axis matrix. In those coordinates a mode with row eigenvalue <i>μ</i> and column eigenvalue <i>ν</i> is divided by <i>1 + λ(μ + ν)</i>. Two successive one-dimensional fits would divide by <i>(1 + λμ)(1 + λν)</i> and produce a different surface. The joint solve also avoids storing a dense matrix with <i>RC</i> rows and columns.</p><pre><code>def radf2d(heights, k):
+    &quot;&quot;&quot;Fit one height at every cell on a rectangular, unit-spaced grid.&quot;&quot;&quot;
+    import numpy as np
+
+    y = np.asarray(heights, dtype=float)
+    if y.ndim != 2 or min(y.shape) &lt; 5 or not np.isfinite(y).all():
+        raise ValueError(&quot;Supply a finite grid with at least 5 rows and 5 columns.&quot;)
+    if not 0 &lt; k &lt; 1:
+        raise ValueError(&quot;Use a smoothing parameter strictly between 0 and 1.&quot;)
+
+    def bending_modes(size):
+        d = np.diff(np.eye(size), n=2, axis=0)
+        values, vectors = np.linalg.eigh(d.T @ d)
+        values[:2] = 0.0  # Constant and linear modes have exactly zero bend.
+        return values, vectors
+
+    row_values, u = bending_modes(y.shape[0])
+    col_values, v = bending_modes(y.shape[1])
+    penalty = row_values[:, None] + col_values[None, :]
+    modes = u.T @ y @ v
+    return u @ (modes / (1 + (k / (1 - k)) * penalty)) @ v.T</code></pre></details>
+</section>
+
+<section class="references" aria-label="Sources"><p class="source"><b>Sources.</b> Roland Adorni’s C# vector source file supplies the RadF objective, the three curve parameter conventions and the one-dimensional Maxima equations. His C# matrix source file gives the two-dimensional objective, its 49 symbolic equations on a 7 × 7 grid, and the boundary templates used by <code>RadF2DSmoothing</code>. The saved annual fits and the annual/monthly comparison record the original parameter choices.</p>
+</section>
+</article></main>
+<footer>RadF Data Smoothing <span>·</span> Roland Adorni <span>·</span> Version 1.07</footer>
+<script>// y holds the measured heights. p holds optional, already normalized weights.
+function radF(y, k, w = 1, p = Array(y.length).fill(1)) {
+  const n = y.length;
+  if (n < 5 || p.length !== n || !y.every(Number.isFinite) ||
+      !p.every(v => Number.isFinite(v) && v >= 0) ||
+      p.filter(v => v > 0).length < 2 ||
+      !(k > 0 && k < 1 && w > 0 && Number.isFinite(w))) {
+    throw new RangeError("Check the samples, weights and smoothing parameter.");
+  }
+
+  // Store the main diagonal and the two bands immediately below it.
+  const b = k * w;
+  const diag = p.map(v => (1 - k) * v);
+  const rhs = diag.map((v, i) => v * y[i]);
+  const near = Array(n).fill(0);
+  const far = Array(n).fill(0);
+  for (let i = 0; i < n - 2; i++) {
+    diag[i] += b;
+    diag[i + 1] += 4 * b;
+    diag[i + 2] += b;
+    near[i + 1] -= 2 * b;
+    near[i + 2] -= 2 * b;
+    far[i + 2] += b;
+  }
+
+  // Cholesky factorization A = L Lᵀ, reusing the three bands.
+  // Solve L u = rhs in the same forward pass.
+  for (let i = 0; i < n; i++) {
+    if (i >= 2) far[i] /= diag[i - 2];
+    if (i >= 1) near[i] = (near[i] - far[i] * near[i - 1]) / diag[i - 1];
+    const pivot = diag[i] - near[i] ** 2 - far[i] ** 2;
+    if (!(pivot > 0 && Number.isFinite(pivot))) {
+      throw new RangeError("No positive pivot at this precision.");
+    }
+    diag[i] = Math.sqrt(pivot);
+    if (i >= 2) rhs[i] -= far[i] * rhs[i - 2];
+    if (i >= 1) rhs[i] -= near[i] * rhs[i - 1];
+    rhs[i] /= diag[i];
+  }
+
+  // Solve Lᵀ z = u from the last sample to the first.
+  for (let i = n - 1; i >= 0; i--) {
+    if (i + 2 < n) rhs[i] -= far[i + 2] * rhs[i + 2];
+    if (i + 1 < n) rhs[i] -= near[i + 1] * rhs[i + 1];
+    rhs[i] /= diag[i];
+  }
+  return rhs;
+}
+
+const measurements = [-0.22823801205829233, -0.20877610361986332, -0.18744818574844546, -0.1159196122548494, 0.46897787592242335, 0.6533305211540152, 0.10287294096112207, 0.7884525579783828, 0.8595884413912145, 0.7589871943738989, 0.5090962183830687, 0.8638165021076806, 1.1481470762965194, 0.40262328330206687, 0.8059380959178225, 0.9464410235635998, 0.9222929361323695, 0.5478841115292381, 0.7385108917001632, 1.2413011926950765, 0.5065460640717256, 0.6570136583223531, 0.7805818694573963, 0.8164456305594912, 0.29263739454017984, 0.11880409932342846, 0.6298944420456383, -0.1393724385068609, -0.328610697151537, -0.3672532317776789, -0.2624042703964981, -0.7520540568101695, -1.14628076000547, -0.4731493016067067, -0.9025533663804264, -1.018575644041045, -0.920060319139131, -0.42696423100075936, -0.4644886359398454, -0.7930351552912998, 0.12176198794170587];
+const regression = [0.7779958788889876, 0.7475677459054427, 0.7171396129218979, 0.6867114799383529, 0.6562833469548081, 0.6258552139712632, 0.5954270809877183, 0.5649989480041735, 0.5345708150206286, 0.5041426820370838, 0.4737145490535389, 0.44328641606999397, 0.41285828308644906, 0.38243015010290426, 0.35200201711935936, 0.32157388413581456, 0.29114575115226965, 0.26071761816872474, 0.2302894851851799, 0.19986135220163503, 0.16943321921809018, 0.13900508623454533, 0.10857695325100036, 0.07814882026745551, 0.047720687283910546, 0.017292554300365803, -0.01313557868317905, -0.043563711666724014, -0.07399184465026887, -0.10441997763381372, -0.13484811061735846, -0.16527624360090343, -0.19570437658444828, -0.22613250956799313, -0.2565606425515381, -0.28698877553508284, -0.3174169085186278, -0.34784504150217277, -0.3782731744857175, -0.4087013074692625, -0.4391294404528072];
+const slider = document.getElementById("strength");
+const output = document.getElementById("reading");
+function redraw() {
+  // Stretch the low end while keeping the original fit at the midpoint.
+  const t = Number(slider.value) / Number(slider.max);
+  const left = 0.08 * t ** 2;
+  const right = 0.92 * (1 - t) ** 2;
+  const k = left / (left + right);
+  let z = measurements;
+  if (k === 1) z = regression;
+  else if (k > 0) z = radF(measurements, k, measurements.length ** 2);
+  const path = z.map((v, i) => {
+    const x = 36 + (508 - 36) * i / (z.length - 1);
+    const y = 190 - 170 * (v + 1.75) / 3.5;
+    return (i === 0 ? "M" : "L") + x.toFixed(3) + "," + y.toFixed(3);
+  });
+  document.getElementById("activeFit").setAttribute("d", path.join(" "));
+  const label = k === 0 || k === 1 ? String(k) : Number(k.toFixed(9)).toString();
+  output.value = label;
+  slider.setAttribute("aria-valuetext", label);
+}
+slider.addEventListener("input", redraw);
+document.querySelector(".control").hidden = false;
+redraw();
+</script>
+</body></html>
